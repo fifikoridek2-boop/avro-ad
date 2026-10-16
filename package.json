@@ -1,0 +1,10 @@
+{
+  "name": "avro-ad-render",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Frame-exact 1920x1080 / 60 fps render of the Avro opening ad",
+  "scripts": {
+    "render": "node export-avro.js index.html out/avro-ad.mp4"
+  },
+  "dependencies": { "playwright": "1.48.2" }
+}
