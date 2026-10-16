@@ -36,7 +36,8 @@ const FPS = +arg('fps', 60), CRF = arg('crf', '14'), T0 = +arg('from', 0), T1 = 
   await page.goto('file://' + path.resolve(html) + '?export', { waitUntil: 'load' });
   const dur = await page.evaluate(() => window.avroScene.dur);
   const end = T1 === null ? dur : Math.min(+T1, dur);
-  const need3D = end > 8.9;
+  const pageNeeds = await page.evaluate(() => window.avroScene.needs3D);
+  const need3D = pageNeeds === undefined ? end > 8.9 : !!pageNeeds;   // part 2 is 3D from its first frame
 
   /* everything small must really be loaded before the first frame: fonts for the painted phone text, and three.js */
   await page.evaluate(() => Promise.all(['400', '500', '600', '700'].map(w => document.fonts.load(w + ' 20px Outfit'))).catch(() => {}));
