@@ -6,7 +6,7 @@
  * result is identical on every run and never drops frames), pipes PNG frames to
  * ffmpeg. Motion blur is part of each frame (sub-frame accumulation).
  *
- * Usage:  node export-avro.js index.html avro-ad.mp4 [--fps 60] [--crf 14]
+ * Usage:  node export-avro.js avro-ad.html avro-ad.mp4 [--fps 60] [--crf 14]
  *                             [--from 0] [--to 13.1] [--three ./three.min.js]
  * Needs:  node, `npm i playwright`, ffmpeg on PATH, a Chromium (playwright install chromium).
  * The page loads three.js (cdnjs r128) and the Outfit font (Google Fonts); if the
@@ -24,7 +24,7 @@ const FPS = +arg('fps', 60), CRF = arg('crf', '14'), T0 = +arg('from', 0), T1 = 
   const exe = process.env.CHROMIUM_PATH;
   const browser = await chromium.launch({
     executablePath: exe || undefined,
-    args: ['--no-sandbox', '--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl', '--disable-background-timer-throttling']
+    args: ['--allow-file-access-from-files', '--no-sandbox', '--ignore-gpu-blocklist', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl', '--disable-background-timer-throttling']
   });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   const errs = [];
@@ -40,7 +40,7 @@ const FPS = +arg('fps', 60), CRF = arg('crf', '14'), T0 = +arg('from', 0), T1 = 
   const need3D = pageNeeds === undefined ? end > 8.9 : !!pageNeeds;   // part 2 is 3D from its first frame
 
   /* everything small must really be loaded before the first frame: fonts for the painted phone text, and three.js */
-  await page.evaluate(() => Promise.all(['400', '500', '600', '700'].map(w => document.fonts.load(w + ' 20px Outfit'))).catch(() => {}));
+  await page.evaluate(() => Promise.all(['400', '500', '600', '700'].map(w => document.fonts.load(w + ' 20px Outfit')).concat([document.fonts.load('400 20px "JetBrains Mono"')])).catch(() => {}));
   if (need3D) {
     const t0 = Date.now();
     while (!(await page.evaluate(() => window.avroScene.ready())) && Date.now() - t0 < 60000) await page.waitForTimeout(250);
