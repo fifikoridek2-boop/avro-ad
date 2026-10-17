@@ -1,0 +1,104 @@
+
+name: Render Avro ad - part 3
+
+on:
+  workflow_dispatch:
+    inputs:
+      fps:
+        description: 'Frames per second'
+        default: '60'
+        required: true
+      crf:
+        description: 'x264 CRF (lower = better, 14 is visually lossless)'
+        default: '14'
+        required: true
+  push:
+    branches: [main]
+    paths:
+      - avro-ad-03.html
+      - export-avro.js
+      - package.json
+      - .github/workflows/render-part3.yml
+
+concurrency:
+  group: render3-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FPS: ${{ inputs.fps || '60' }}
+  CRF: ${{ inputs.crf || '14' }}
+
+jobs:
+  render:
+    name: Render segment ${{ matrix.idx }}/4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { idx: 1, from: '0', to: '7' }
+          - { idx: 2, from: '7', to: '14' }
+          - { idx: 3, from: '14', to: '21' }
+          - { idx: 4, from: '21', to: '' }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Render segment
+        shell: bash
+        run: |
+          mkdir -p out
+          ARGS=(--fps "$FPS" --crf "$CRF" --from "${{ matrix.from }}")
+          if [[ -n "${{ matrix.to }}" ]]; then
+            ARGS+=(--to "${{ matrix.to }}")
+          fi
+          node export-avro.js avro-ad-03.html "out/p3part${{ matrix.idx }}.mp4" "${ARGS[@]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p3part${{ matrix.idx }}
+          path: out/p3part${{ matrix.idx }}.mp4
+          retention-days: 3
+          if-no-files-found: error
+
+  join:
+    name: Join segments
+    needs: render
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: parts
+          merge-multiple: true
+
+      - name: Concatenate and verify video
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          for i in 1 2 3 4; do
+            echo "file 'parts/p3part$i.mp4'" >> list.txt
+          done
+          ffmpeg -y -loglevel error -f concat -safe 0 -i list.txt -c copy -movflags +faststart avro-ad-part3.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames,duration -of default=nw=1 avro-ad-part3.mp4
+          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 avro-ad-part3.mp4)" = "1920"
+          test "$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 avro-ad-part3.mp4)" = "1080"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avro-ad-part3-1080p60
+          path: avro-ad-part3.mp4
+          retention-days: 30
+          if-no-files-found: error
